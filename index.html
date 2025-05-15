@@ -13,7 +13,7 @@
       transform: translateX(-50%);
       font-family: Arial, sans-serif;
       font-size: 16px;
-      color: #000;
+      color: #58bd00;
       user-select: text;
       white-space: nowrap;
       background: rgba(255,255,255,0.8);
@@ -56,57 +56,75 @@
     }
 
     function drawEAN() {
-      const now = new Date();
-      const mm = String(now.getMonth()+1).padStart(2,"0"),
-            dd = String(now.getDate()).padStart(2,"0"),
-            hh = String(now.getHours()).padStart(2,"0"),
-            mi = String(now.getMinutes()).padStart(2,"0");
-      const base12 = `2400${mm}${dd}${hh}${mi}`;
-      const check = calcChecksum(base12);
-      const code13 = base12 + check;
+  const now = new Date();
 
-      const canvas = document.getElementById("ean"),
-            cw = canvas.clientWidth,
-            ch = canvas.clientHeight;
-      canvas.width  = cw * devicePixelRatio;
-      canvas.height = ch * devicePixelRatio;
-      const ctx = canvas.getContext("2d");
-      ctx.scale(devicePixelRatio, devicePixelRatio);
-      ctx.clearRect(0, 0, cw, ch);
+  // 1) Generar un número aleatorio entre 1 y 10
+  const resta = Math.floor(Math.random() * 10) + 1;
 
-      // Generar patrón
-      let pat = "101";
-      const first = +code13[0],
-            left = code13.slice(1,7),
-            right = code13.slice(7);
-      parityMap[first].forEach((p,i) =>
-        pat += (p === "L" ? L[left[i]] : G[left[i]])
-      );
-      pat += "01010";
-      right.split("").forEach(d => pat += R[d]);
-      pat += "101";
+  // 2) Extraer y ajustar horas y minutos
+  let horas = now.getHours();
+  let minutos = now.getMinutes() - resta;
 
-      // Dibujar barras con margen
-      const margin = cw * 0.05,
-            usableWidth = cw - 2 * margin,
-            barW = usableWidth / 95,
-            barH = ch * 0.8;
-      ctx.fillStyle = "#000";
-      pat.split("").forEach((bit,i) => {
-        if (bit === "1") {
-          ctx.fillRect(margin + i * barW, 0, barW, barH);
-        }
-      });
+  // 3) Normalizar cruce de hora
+  if (minutos < 0) {
+    minutos += 60;
+    horas = (horas - 1 + 24) % 24;
+  }
 
-      // Actualizar texto seleccionable
-      document.getElementById("code-text").textContent = code13;
+  // 4) Formatear con dos dígitos
+  const hh = String(horas).padStart(2, "0");
+  const mi = String(minutos).padStart(2, "0");
 
-      // Fullscreen toggling
-      canvas.onclick = () => {
-        if (document.fullscreenElement) document.exitFullscreen();
-        else canvas.requestFullscreen();
-      };
+  // 5) El resto igual que antes
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const base12 = `2400${mm}${dd}${hh}${mi}`;
+  const check = calcChecksum(base12);
+  const code13 = base12 + check;
+
+  const canvas = document.getElementById("ean"),
+        cw = canvas.clientWidth,
+        ch = canvas.clientHeight;
+  canvas.width  = cw * devicePixelRatio;
+  canvas.height = ch * devicePixelRatio;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  ctx.clearRect(0, 0, cw, ch);
+
+  // Generar patrón
+  let pat = "101";
+  const first = +code13[0],
+        left = code13.slice(1,7),
+        right = code13.slice(7);
+  parityMap[first].forEach((p,i) =>
+    pat += (p === "L" ? L[left[i]] : G[left[i]])
+  );
+  pat += "01010";
+  right.split("").forEach(d => pat += R[d]);
+  pat += "101";
+
+  // Dibujar barras con margen
+  const margin = cw * 0.05,
+        usableWidth = cw - 2 * margin,
+        barW = usableWidth / 95,
+        barH = ch * 0.8;
+  ctx.fillStyle = "#000";
+  pat.split("").forEach((bit,i) => {
+    if (bit === "1") {
+      ctx.fillRect(margin + i * barW, 0, barW, barH);
     }
+  });
+
+  // Actualizar texto seleccionable
+  document.getElementById("code-text").textContent = code13;
+
+  // Fullscreen toggling
+  canvas.onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else canvas.requestFullscreen();
+  };
+}
+
 
    
     window.onload = drawEAN;
