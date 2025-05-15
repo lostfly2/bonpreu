@@ -31,7 +31,6 @@
 <body>
   <canvas id="ean"></canvas>
   <div id="code-text"></div>
-  <button id="regen">Generar de nuevo</button>
 
   <script>
     const L = {0:"0001101",1:"0011001",2:"0010011",3:"0111101",4:"0100011",5:"0110001",
@@ -109,7 +108,7 @@
       };
     }
 
-    document.getElementById("regen").onclick = drawEAN;
+   
     window.onload = drawEAN;
   </script>
 </body>
