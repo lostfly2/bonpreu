@@ -1,2 +1,2 @@
-# bonpreu
-EAN13 Bonpreu
+# BP
+EAN13 BP
