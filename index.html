@@ -20,12 +20,6 @@
       padding: 6px 6px;
       border-radius: 1px;
     }
-    #regen {
-      position:absolute;
-      top:10px; right:10px;
-      z-index:10;
-      padding:8px;
-    }
   </style>
 </head>
 <body>
@@ -33,6 +27,7 @@
   <div id="code-text"></div>
 
   <script>
+    // Mapas de bits para EAN-13
     const L = {0:"0001101",1:"0011001",2:"0010011",3:"0111101",4:"0100011",5:"0110001",
                6:"0101111",7:"0111011",8:"0110111",9:"0001011"};
     const G = {0:"0100111",1:"0110011",2:"0011011",3:"0100001",4:"0011101",5:"0111001",
@@ -46,6 +41,7 @@
       9:["L","G","G","L","G","L"]
     };
 
+    // Cálculo del dígito de control EAN-13
     function calcChecksum(code12) {
       let sum = 0;
       for (let i = 0; i < 12; i++) {
@@ -55,79 +51,94 @@
       return (10 - (sum % 10)) % 10;
     }
 
-    function drawEAN() {
-  const now = new Date();
-
-  // 1) Generar un número aleatorio entre 1 y 10
-  const resta = Math.floor(Math.random() * 10) + 1;
-
-  // 2) Extraer y ajustar horas y minutos
-  let horas = now.getHours();
-  let minutos = now.getMinutes() - resta;
-
-  // 3) Normalizar cruce de hora
-  if (minutos < 0) {
-    minutos += 60;
-    horas = (horas - 1 + 24) % 24;
-  }
-
-  // 4) Formatear con dos dígitos
-  const hh = String(horas).padStart(2, "0");
-  const mi = String(minutos).padStart(2, "0");
-
-  // 5) El resto igual que antes
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const base12 = `2400${mm}${dd}${hh}${mi}`;
-  const check = calcChecksum(base12);
-  const code13 = base12 + check;
-
-  const canvas = document.getElementById("ean"),
-        cw = canvas.clientWidth,
-        ch = canvas.clientHeight;
-  canvas.width  = cw * devicePixelRatio;
-  canvas.height = ch * devicePixelRatio;
-  const ctx = canvas.getContext("2d");
-  ctx.scale(devicePixelRatio, devicePixelRatio);
-  ctx.clearRect(0, 0, cw, ch);
-
-  // Generar patrón
-  let pat = "101";
-  const first = +code13[0],
-        left = code13.slice(1,7),
-        right = code13.slice(7);
-  parityMap[first].forEach((p,i) =>
-    pat += (p === "L" ? L[left[i]] : G[left[i]])
-  );
-  pat += "01010";
-  right.split("").forEach(d => pat += R[d]);
-  pat += "101";
-
-  // Dibujar barras con margen
-  const margin = cw * 0.05,
-        usableWidth = cw - 2 * margin,
-        barW = usableWidth / 95,
-        barH = ch * 0.8;
-  ctx.fillStyle = "#000";
-  pat.split("").forEach((bit,i) => {
-    if (bit === "1") {
-      ctx.fillRect(margin + i * barW, 0, barW, barH);
+    // Obtiene píxeles por mm en este dispositivo
+    function getPxPerMm() {
+      const div = document.createElement('div');
+      div.style.width = '1in';
+      div.style.position = 'absolute';
+      div.style.left = '-100%';
+      document.body.appendChild(div);
+      const pxPerInch = div.offsetWidth;
+      document.body.removeChild(div);
+      return pxPerInch / 25.4;
     }
-  });
 
-  // Actualizar texto seleccionable
-  document.getElementById("code-text").textContent = code13;
+    let storedCode = null;
 
-  // Fullscreen toggling
-  canvas.onclick = () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else canvas.requestFullscreen();
-  };
-}
+    function drawCanvas(code13) {
+      const canvas = document.getElementById("ean");
+      const cw = canvas.clientWidth;
+      const ch = canvas.clientHeight;
+      canvas.width  = cw * devicePixelRatio;
+      canvas.height = ch * devicePixelRatio;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      ctx.clearRect(0, 0, cw, ch);
 
+      const pxPerMm = getPxPerMm();
+      const margin = pxPerMm * 7; // 4 mm en px
 
-   
-    window.onload = drawEAN;
+      // Generar patrón de bits
+      let pat = "101";
+      const first = +code13[0],
+            left  = code13.slice(1,7),
+            right = code13.slice(7);
+      parityMap[first].forEach((p,i) =>
+        pat += (p === "L" ? L[left[i]] : G[left[i]])
+      );
+      pat += "01010";
+      right.split("").forEach(d => pat += R[d]);
+      pat += "101";
+
+      // Dimensiones de la zona de dibujo
+      const usableWidth  = cw - 2 * margin;
+      const usableHeight = ch - 2 * margin;
+      const barW = usableWidth / pat.length;
+      const barH = usableHeight * 0.8; // 80% de la altura útil
+
+      ctx.fillStyle = "#000";
+      pat.split("").forEach((bit,i) => {
+        if (bit === "1") {
+          ctx.fillRect(
+            margin + i * barW,    // x desplazado por margen izquierdo
+            margin,               // y desplazado por margen superior
+            barW,
+            barH
+          );
+        }
+      });
+
+      // Texto debajo
+      const textDiv = document.getElementById("code-text");
+      textDiv.textContent = code13;
+      textDiv.style.top = (ch - margin - textDiv.offsetHeight) + "px"; // ajustar verticalmente
+
+      // Fullscreen toggle
+      canvas.onclick = () => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else canvas.requestFullscreen();
+      };
+    }
+
+    function renderEAN(recalcCode = true) {
+      if (recalcCode || !storedCode) {
+        const now = new Date();
+        const resta = Math.floor(Math.random() * 10) + 1;
+        let h = now.getHours(), m = now.getMinutes() - resta;
+        if (m < 0) { m += 60; h = (h - 1 + 24) % 24; }
+        const mm = String(now.getMonth()+1).padStart(2,"0");
+        const dd = String(now.getDate()).padStart(2,"0");
+        const hh = String(h).padStart(2,"0");
+        const mi = String(m).padStart(2,"0");
+        const base12 = `2400${mm}${dd}${hh}${mi}`;
+        const check = calcChecksum(base12);
+        storedCode = base12 + check;
+      }
+      drawCanvas(storedCode);
+    }
+
+    window.addEventListener("load", () => renderEAN(true));
+    window.addEventListener("resize", () => renderEAN(false));
   </script>
 </body>
 </html>
